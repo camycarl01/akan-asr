@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "akan-asr"
+version = "0.1.0"
+description = "Cross-domain Akan (Twi) speech recognition with lightweight adaptation"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "jiwer>=3.0",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+]
+
+[project.optional-dependencies]
+model = ["torch>=2.1", "transformers>=4.44", "datasets>=2.19", "peft>=0.11", "accelerate>=0.30"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules"
+pythonpath = ["src"]

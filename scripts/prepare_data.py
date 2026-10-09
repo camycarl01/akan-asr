@@ -72,7 +72,7 @@ def main() -> None:
                            args.transcript_audio_col, args.transcript_text_col)
         name = "ugspeech"
 
-    if args.limit:
+    if args.limit and args.dataset != "waxal":  # WAXAL already limits per split
         df = df.head(args.limit)
 
     if args.dataset != "waxal":  # WAXAL is written at 16 kHz during download

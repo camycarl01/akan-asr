@@ -14,6 +14,25 @@ from collections.abc import Iterator
 log = logging.getLogger(__name__)
 
 
+# Measured on Ashesi and WAXAL: real transcripts use at most ~14 Whisper tokens
+# per second of normalised Twi (median 2-6). Allowing a little under double that
+# keeps every real transcript while stopping a looping decode early; one looping
+# clip otherwise holds its whole batch to the full 225-token limit.
+TOKENS_PER_SECOND = 12
+TOKEN_MARGIN = 24
+
+
+def token_budget(seconds: float, cap: int) -> int:
+    """Max new tokens for a batch whose longest clip lasts `seconds`.
+
+    >>> token_budget(4.0, 225)
+    72
+    >>> token_budget(30.0, 225)
+    225
+    """
+    return min(cap, int(seconds * TOKENS_PER_SECOND) + TOKEN_MARGIN)
+
+
 def _batches(items: list, size: int) -> Iterator[list]:
     for i in range(0, len(items), size):
         yield items[i:i + size]
@@ -69,7 +88,10 @@ class WhisperTranscriber:
             feats = self.processor(audio, sampling_rate=16_000, return_tensors="pt")
             inputs = feats.input_features.to(self.device, self.dtype)
             with self.torch.inference_mode():
-                ids = self.model.generate(inputs, **self.gen_kwargs)
+                longest = max(len(a) for a in audio) / 16_000
+            kwargs = {**self.gen_kwargs,
+                      "max_new_tokens": token_budget(longest, self.gen_kwargs["max_new_tokens"])}
+            ids = self.model.generate(inputs, **kwargs)
             out.extend(self.processor.batch_decode(ids, skip_special_tokens=True))
             if (i + 1) % 20 == 0:
                 log.info("transcribed %d / %d", len(out), len(paths))

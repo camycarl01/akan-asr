@@ -34,6 +34,7 @@ import soundfile as sf
 from . import manifest
 from .metrics import score
 from .text import normalize
+from .transcribe import token_budget
 
 log = logging.getLogger(__name__)
 
@@ -256,11 +257,13 @@ def evaluate(model, processor, val_dl, val_df: pd.DataFrame, language: str,
     losses, preds = [], []
     with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16,
                                                 enabled=use_amp):
+        durations = val_df["duration_s"].fillna(30.0).tolist()
         for batch in val_dl:
             batch = {k: v.to(device) for k, v in batch.items()}
             losses.append(model(**batch).loss.item())
+            longest = max(durations[len(preds):len(preds) + len(batch["labels"])])
             ids = model.generate(input_features=batch["input_features"], language=language,
-                                 task="transcribe", max_new_tokens=225)
+                                 task="transcribe", max_new_tokens=token_budget(longest, 225))
             preds.extend(processor.batch_decode(ids, skip_special_tokens=True))
 
     per_ds = {}

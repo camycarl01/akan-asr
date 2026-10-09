@@ -1,4 +1,4 @@
-# Akan ASR: robust Twi speech recognition across domains
+source .venv/bin/activate# Akan ASR: robust Twi speech recognition across domains
 
 Current Akan speech models score well on the dataset they were trained on and
 fall apart on others (Mensah et al., 2025: ~30% WER in-domain, 70–100% elsewhere).

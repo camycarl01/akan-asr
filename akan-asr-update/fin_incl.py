@@ -32,9 +32,7 @@ log = logging.getLogger(__name__)
 
 DIALECTS = {"asante", "akuapem", "fante"}
 _FILENAME_RE = re.compile(
-    # Speaker ids are usually 8 alphanumerics but can contain spaces
-    # (seen: "AsantiTwiFm20-A SLRKMb-Tmp010-..."), so accept anything but "-".
-    r"^(?P<prefix>[A-Za-z]+?)(?P<age>\d{1,3})-(?P<speaker>[^-]+?)-Tmp\d+"
+    r"^(?P<prefix>[A-Za-z]+?)(?P<age>\d{1,3})-(?P<speaker>[A-Za-z0-9]+)-"
 )
 # Observed in the real filenames: "Fm" = female, "Ma" = male
 # (AsantiTwiFm23-..., AkuapemTwiMa24-..., GaMa22-...).

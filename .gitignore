@@ -7,3 +7,9 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 wandb/
+
+# raw datasets must never be committed, even if placed inside the repo
+/datasets/
+fin-incl/
+scratch/
+.venv/

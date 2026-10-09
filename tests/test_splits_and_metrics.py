@@ -103,7 +103,12 @@ def test_corpus_wer_weights_by_length():
 
 @pytest.mark.parametrize("name,speaker,gender,age", [
     ("GaFm21-ATuJLn5X-Tmp083-zykm34.ogg", "ATuJLn5X", "female", 21),
-    ("TwiMl34-Q9z7Kd1a-Tmp001-ab12cd.ogg", "Q9z7Kd1a", "male", 34),
+    # real filenames from the downloaded archives
+    ("AsantiTwiFm23-MMuHe3cd-Tmp033-90pZBJ.ogg", "MMuHe3cd", "female", 23),
+    ("AsantiTwiMa23-AOHqG4Hk-Tmp101-W90Pd5.ogg", "AOHqG4Hk", "male", 23),
+    ("AkuapemTwiMa24-POxqPYmx-Tmp087-inx10P.ogg", "POxqPYmx", "male", 24),
+    ("GaMa22-NK54l7ZF-Tmp060-wx410p.ogg", "NK54l7ZF", "male", 22),
+    ("AsantiTwiFm20-A SLRKMb-Tmp010-o9jyxQ.ogg", "A SLRKMb", "female", 20),
     ("garbage.ogg", None, "unknown", None),
 ])
 def test_fin_incl_filename_parsing(name, speaker, gender, age):

@@ -101,7 +101,7 @@ def main() -> None:
             "reference_norm": refs_n, "prediction_norm": hyps_n, "wer": utt_wer,
         }).to_csv(out_dir / f"{name}_predictions.csv", index=False)
 
-        meta = {"model": args.model, "adapter": args.adapter, "language": args.language,
+        meta = {"model": args.model, "adapter": args.adapter, "language": asr.language,
                 "num_beams": args.num_beams, "test_manifest": str(path),
                 "excluded_over_30s": int(too_long.sum()), **res.to_dict()}
         (out_dir / f"{name}_metrics.json").write_text(json.dumps(meta, indent=2))

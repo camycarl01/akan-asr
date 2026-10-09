@@ -16,6 +16,7 @@ Facts from the README that shape this loader:
   same sentences appear in both. We merge them and make our own split.
 - Every speaker read the same ~130 sentences, so even a speaker-disjoint test
   set shares sentences with training. Report that (see splits.text_leakage).
+- A few Twi prompts carry reading notes, not speech (see clean_prompt).
 """
 
 from __future__ import annotations
@@ -55,6 +56,32 @@ def parse_filename(name: str) -> dict:
             gender = label
             break
     return {"speaker": m.group("speaker"), "gender": gender, "age": int(m.group("age"))}
+
+
+# "(spoken)", "(spoken - informal)", "(spoken. Written: Mepawokyew)": a note on
+# the text before it, which is what the speaker said.
+_SPOKEN_NOTE_RE = re.compile(r"\(\s*spoken\b[^)]*\)", re.IGNORECASE)
+
+
+def clean_prompt(text: str) -> str | None:
+    """Remove reading notes from a prompt; None if what was said is unknowable.
+
+    Prompts offering alternatives ("X (informal) / Y (formal)", "A/ B") are
+    dropped: we can't tell which one the speaker read. Seen in 8 of ~130
+    prompts per Twi dialect (2-4% of clips), none in Fante.
+
+    >>> clean_prompt("Mepaa’kyɛw  (spoken. Written: Mepawokyew)")
+    'Mepaa’kyɛw'
+    >>> clean_prompt("Nnipa yɛ bad (informal) / Nnipa nnyɛ (formal)") is None
+    True
+    >>> clean_prompt("Mepɛ sɛ, metua ka")
+    'Mepɛ sɛ, metua ka'
+    """
+    text = _SPOKEN_NOTE_RE.sub(" ", text)
+    if re.search(r"[/()]", text):
+        return None
+    text = " ".join(text.split())
+    return text or None
 
 
 def _pick_column(columns, *needles: str) -> str:
@@ -118,7 +145,7 @@ def load(
     if not audio_index:
         raise FileNotFoundError(f"No audio files found under {root}")
 
-    rows, missing = [], 0
+    rows, missing, ambiguous = [], 0, 0
     for csv in csvs:
         meta = read_metadata(csv)
         pcol = path_col or _pick_column(meta.columns, "path", "file", "audio")
@@ -129,6 +156,10 @@ def load(
             if audio is None or not isinstance(text, str) or not text.strip():
                 missing += 1
                 continue
+            text = clean_prompt(text)
+            if text is None:
+                ambiguous += 1
+                continue
             info = parse_filename(fname)
             if info["speaker"] is None:
                 missing += 1
@@ -136,7 +167,7 @@ def load(
             rows.append({
                 "utt_id": f"fin_incl:{dialect}:{Path(fname).stem}",
                 "audio_path": str(audio),
-                "text": text.strip(),
+                "text": text,
                 "speaker_id": f"fin_incl:{info['speaker']}",
                 "dataset": "fin_incl",
                 "dialect": dialect,
@@ -145,5 +176,8 @@ def load(
     if missing:
         log.warning("fin_incl/%s: skipped %d rows (no audio, no text or unparsable name)",
                     dialect, missing)
+    if ambiguous:
+        log.warning("fin_incl/%s: dropped %d rows whose prompt offers alternatives",
+                    dialect, ambiguous)
     df = make_manifest(rows)
     return df.drop_duplicates("utt_id").reset_index(drop=True)

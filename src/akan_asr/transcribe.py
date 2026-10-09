@@ -37,11 +37,22 @@ class WhisperTranscriber:
         dtype = torch.float16 if self.device == "cuda" else torch.float32
         self.processor = WhisperProcessor.from_pretrained(model_name)
         model = WhisperForConditionalGeneration.from_pretrained(model_name, torch_dtype=dtype)
-        if adapter:  # a LoRA adapter folder from Week 2 training
+        if adapter:  # a LoRA adapter folder from scripts/train_lora.py
             from peft import PeftModel
+
+            from .finetune import read_train_config
+            trained = read_train_config(adapter) or {}
+            if language is None and trained.get("language"):
+                # Decode with the same stand-in token the adapter was trained with.
+                language = trained["language"]
+                log.info("using language token %r from the adapter's train_config", language)
+            elif language and trained.get("language") not in (None, language):
+                log.warning("adapter was trained with language %r but decoding with %r",
+                            trained["language"], language)
             model = PeftModel.from_pretrained(model, adapter).merge_and_unload()
         self.model = model.to(self.device).eval()
         self.dtype = dtype
+        self.language = language
         self.gen_kwargs = {"task": "transcribe", "num_beams": num_beams,
                            "max_new_tokens": max_new_tokens}
         if language:

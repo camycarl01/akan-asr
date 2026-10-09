@@ -17,6 +17,7 @@ Status: Week 1 — data pipeline and zero-shot baseline.
 | `src/akan_asr/splits.py` | Speaker-disjoint splits, sentence-leakage report, WAXAL/UGSpeechData duplicate check |
 | `src/akan_asr/metrics.py` | Corpus WER/CER with 95% bootstrap confidence intervals |
 | `src/akan_asr/transcribe.py` | Batched Whisper inference (zero-shot or with a LoRA adapter) |
+| `src/akan_asr/finetune.py` | LoRA fine-tuning loop, keeps the checkpoint with the best mean validation WER across datasets |
 | `scripts/` | The three commands you actually run |
 | `tests/` | `pytest` — run it after any change to normalisation or splitting |
 
@@ -76,12 +77,37 @@ metrics JSON, and per-utterance predictions for error analysis.
 7. Copy `data/manifests` and `data/splits` (small CSVs) into a Kaggle Dataset
    so Week 2 doesn't redo this. The WAVs can stay in the notebook output.
 
+## Training a LoRA adapter (Week 2)
+
+```bash
+!python scripts/train_lora.py data/splits/fin_incl_train.csv \
+    --val data/splits/fin_incl_validation.csv data/splits/waxal_validation.csv
+!python scripts/run_baseline.py data/splits/*_test.csv \
+    --adapter adapters/whisper-small-fin_incl-r32/best
+```
+
+Always pass the validation sets of *every* domain to `--val`, including ones
+you don't train on, and watch `history.csv`: the cross-domain WER column is the
+experiment. Try `--limit 200 --max-steps 20` first to check it runs.
+Defaults: rank 32, alpha 64, q/v projections, lr 1e-3, 3 epochs, batch 16.
+Copy `adapters/` to a Kaggle Dataset after each run; it is a few MB.
+
+The three runs to compare:
+
+| Train on | Test on |
+| --- | --- |
+| `fin_incl_train.csv` | every `*_test.csv` |
+| `waxal_train.csv` | every `*_test.csv` |
+| both | every `*_test.csv` |
+
 ## Decisions to record in the write-up
 
 - Normalisation: lowercase, no punctuation, no tone marks, look-alikes mapped to ɛ/ɔ. Same for every model.
 - Splits: 80/10/10 by audio duration, speaker-disjoint, per dataset, seed 13.
 - Clips over 30 s are excluded from Whisper evaluation (Whisper only sees 30 s); the count is saved in each metrics file.
 - Whisper has no Akan language token; the baseline uses auto-detect. Try `--language yoruba` or `--language swahili` as a side experiment.
+- Fine-tuning uses the `yoruba` token as a stand-in for Akan in both training and decoding (saved in the adapter's `train_config.json`, picked up automatically by `run_baseline.py`). Training targets are the normalised transcripts.
+- Ashesi prompts that offer alternatives ("X (informal) / Y (formal)") are dropped, since we can't know which one was read; "(spoken ...)" notes are stripped. About 3% of Asante and Akuapem clips; none in Fante.
 
 ## Tests
 

@@ -34,6 +34,15 @@ log = logging.getLogger("baseline")
 WHISPER_MAX_S = 30.0
 
 
+def _fmt(rate) -> str:
+    return f"{100*rate.value:.1f} [{100*rate.ci_low:.1f}, {100*rate.ci_high:.1f}]"
+
+
+def _row(test_set: str, subset: str, res) -> dict:
+    return {"test_set": test_set, "subset": subset, "n": res.n_utterances,
+            "WER %": _fmt(res.wer), "CER %": _fmt(res.cer)}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -72,8 +81,10 @@ def main() -> None:
             log.warning("%s: excluding %d clips longer than %.0f s",
                         name, int(too_long.sum()), WHISPER_MAX_S)
             df = df[~too_long]
-        if args.limit:
-            df = df.head(args.limit)
+        if args.limit and len(df) > args.limit:
+            # Random (seeded) rather than first-N: test files are grouped by
+            # speaker and dialect, so head() would test one dialect only.
+            df = df.sample(n=args.limit, random_state=0)
         if df.empty:
             log.warning("%s: nothing to evaluate", name)
             continue
@@ -94,11 +105,18 @@ def main() -> None:
                 "num_beams": args.num_beams, "test_manifest": str(path),
                 "excluded_over_30s": int(too_long.sum()), **res.to_dict()}
         (out_dir / f"{name}_metrics.json").write_text(json.dumps(meta, indent=2))
-        summary.append({
-            "test_set": name, "n": res.n_utterances,
-            "WER %": f"{100*res.wer.value:.1f} [{100*res.wer.ci_low:.1f}, {100*res.wer.ci_high:.1f}]",
-            "CER %": f"{100*res.cer.value:.1f} [{100*res.cer.ci_low:.1f}, {100*res.cer.ci_high:.1f}]",
-        })
+        summary.append(_row(name, "all", res))
+
+        # Per-dialect breakdown (e.g. Asante vs Akuapem vs Fante).
+        dialects = df["dialect"].fillna("unknown")
+        if dialects.nunique() > 1:
+            meta["by_dialect"] = {}
+            for dialect in sorted(dialects.unique()):
+                mask = (dialects == dialect).to_numpy()
+                sub = score(df["text"][mask].tolist(), [p for p, m in zip(preds, mask) if m])
+                meta["by_dialect"][dialect] = sub.to_dict()
+                summary.append(_row(name, dialect, sub))
+            (out_dir / f"{name}_metrics.json").write_text(json.dumps(meta, indent=2))
 
     table = pd.DataFrame(summary)
     table.to_csv(out_dir / "summary.csv", index=False)

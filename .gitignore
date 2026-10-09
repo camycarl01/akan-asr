@@ -13,3 +13,6 @@ wandb/
 fin-incl/
 scratch/
 .venv/
+.pytest_cache/
+.DS_Store
+*.zip

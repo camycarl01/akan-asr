@@ -1,4 +1,4 @@
-source .venv/bin/activate# Akan ASR: robust Twi speech recognition across domains
+# Akan ASR: robust Twi speech recognition across domains
 
 Current Akan speech models score well on the dataset they were trained on and
 fall apart on others (Mensah et al., 2025: ~30% WER in-domain, 70–100% elsewhere).
@@ -29,6 +29,9 @@ Status: Week 1 — data pipeline and zero-shot baseline.
 | UGSpeechData Akan | [Science Data Bank](https://doi.org/10.57760/sciencedb.22298) | CC BY-NC-ND 4.0 | Wait for the lab's reply before publishing any model trained on it. |
 
 ## Running it on Kaggle (Week 1)
+
+Easiest: import `notebooks/week1_kaggle.ipynb` into Kaggle (File → Import Notebook) and run it top to bottom. The steps below are the same thing by hand.
+
 
 1. New notebook → Settings → Accelerator: GPU T4 ×2, Internet: on.
 2. Upload the extracted Ashesi folders as a Kaggle Dataset (e.g. `fin-incl-akan`) and attach it.

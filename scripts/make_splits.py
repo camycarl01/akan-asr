@@ -38,7 +38,9 @@ def main() -> None:
                     help="remove WAXAL clips that duplicate UGSpeechData clips")
     args = ap.parse_args()
 
-    df = pd.concat([manifest.load(p) for p in args.manifests], ignore_index=True)
+    # Older runs wrote <name>_failures.csv next to the manifests; skip those.
+    paths = [p for p in args.manifests if not p.stem.endswith("_failures")]
+    df = pd.concat([manifest.load(p) for p in paths], ignore_index=True)
     manifest.validate(df)
 
     datasets = set(df["dataset"])

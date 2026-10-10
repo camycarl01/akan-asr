@@ -78,7 +78,9 @@ def main() -> None:
     if args.dataset != "waxal":  # WAXAL is written at 16 kHz during download
         df, failures = convert_manifest(df, args.out / "audio" / name, args.workers)
         if len(failures):
-            fail_path = args.out / "manifests" / f"{name}_failures.csv"
+            # Not in manifests/: make_splits.py globs that folder for manifests.
+            fail_path = args.out / "failures" / f"{name}.csv"
+            fail_path.parent.mkdir(parents=True, exist_ok=True)
             failures.to_csv(fail_path, index=False)
             log.warning("%d files failed to convert; listed in %s", len(failures), fail_path)
 

@@ -107,6 +107,7 @@ The three runs to compare:
 - Clips over 30 s are excluded from Whisper evaluation (Whisper only sees 30 s); the count is saved in each metrics file.
 - Whisper has no Akan language token; the baseline uses auto-detect. Try `--language yoruba` or `--language swahili` as a side experiment.
 - Fine-tuning uses the `yoruba` token as a stand-in for Akan in both training and decoding (saved in the adapter's `train_config.json`, picked up automatically by `run_baseline.py`). Training targets are the normalised transcripts.
+- Ashesi transcripts keep digits as written ("Me number yɛ 024", "credit 10 cedis"; 6 prompts per dialect, ~4–5% of clips), so models learn to output digits. Some Fante prompts end with an English gloss ("Nantsew yie farewell"); listening confirmed speakers say it, so it stays.
 - Ashesi prompts that offer alternatives ("X (informal) / Y (formal)") are dropped, since we can't know which one was read; "(spoken ...)" notes are stripped. About 3% of Asante and Akuapem clips; none in Fante.
 
 ## Tests

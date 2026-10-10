@@ -60,11 +60,14 @@ def main() -> None:
 
     from akan_asr.transcribe import WhisperTranscriber
 
-    run = args.run_name or "-".join(filter(None, [
-        args.model.split("/")[-1],
-        "lora" if args.adapter else "zeroshot",
-        args.language,
-    ]))
+    if args.run_name:
+        run = args.run_name
+    elif args.adapter:
+        # adapters/<run>/best -> "<run>-best", so several adapters never share a folder
+        a = Path(args.adapter)
+        run = f"{a.parent.name}-{a.name}" if a.name in ("best", "last") else a.name
+    else:
+        run = "-".join(filter(None, [args.model.split("/")[-1], "zeroshot", args.language]))
     out_dir = args.results / run
     out_dir.mkdir(parents=True, exist_ok=True)
     asr = WhisperTranscriber(args.model, language=args.language,

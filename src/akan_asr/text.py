@@ -26,6 +26,7 @@ _LOOKALIKES = {
     "ε": "ɛ",  # Greek small epsilon ε -> ɛ
     "Ε": "ɛ",  # Greek capital epsilon Ε -> ɛ
     "Ɛ": "ɛ",  # Latin capital open E Ɛ -> ɛ
+    "ℇ": "ɛ",  # Euler constant sign ℇ -> ɛ (seen in WAXAL transcripts)
     "Ɔ": "ɔ",  # Latin capital open O Ɔ -> ɔ
     "ͻ": "ɔ",  # Greek small reversed lunate sigma ͻ -> ɔ
     "Ͻ": "ɔ",  # Greek capital reversed lunate sigma Ͻ -> ɔ

@@ -79,6 +79,8 @@ metrics JSON, and per-utterance predictions for error analysis.
 
 ## Training a LoRA adapter (Week 2)
 
+Easiest: import `notebooks/week2_kaggle.ipynb` into Kaggle and run it. It prepares Ashesi and WAXAL, runs the WAXAL zero-shot baseline, then trains and scores the three adapters below with equal steps. The commands it runs:
+
 ```bash
 !python scripts/train_lora.py data/splits/fin_incl_train.csv \
     --val data/splits/fin_incl_validation.csv data/splits/waxal_validation.csv

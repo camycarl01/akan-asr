@@ -39,8 +39,8 @@ CONFIG = "aka_asr"
 LABELLED_SPLITS = ("train", "validation", "test")
 
 
-def _rows(lang: str, split: str, limit: int | None) -> Iterator[dict]:
-    """Yield raw rows of one split, one parquet row group at a time.
+def _row_groups(lang: str, split: str, limit: int | None) -> Iterator[list[dict]]:
+    """Yield the raw rows of one split, one parquet row group (~100 rows) at a time.
 
     With a limit, read remotely so only the first row group is fetched;
     otherwise download each file once into the Hugging Face cache.
@@ -60,11 +60,13 @@ def _rows(lang: str, split: str, limit: int | None) -> Iterator[dict]:
             source = hf_hub_download(REPO, remote.split(f"{REPO}/", 1)[1], repo_type="dataset")
         pf = pq.ParquetFile(source)
         for group in range(pf.num_row_groups):
-            for row in pf.read_row_group(group).to_pylist():
-                yield row
-                n += 1
-                if limit and n >= limit:
-                    return
+            rows = pf.read_row_group(group).to_pylist()
+            if limit:
+                rows = rows[:limit - n]
+            yield rows
+            n += len(rows)
+            if limit and n >= limit:
+                return
 
 
 def _write_wav(audio_bytes: bytes, dst: Path) -> float:
@@ -83,47 +85,57 @@ def _write_wav(audio_bytes: bytes, dst: Path) -> float:
     return len(audio) / TARGET_SR
 
 
-def load(out_dir: str | Path, config: str = CONFIG, max_per_split: int | None = None
-         ) -> pd.DataFrame:
+def _decode_job(job: tuple[bytes, Path]) -> tuple[float | None, str | None]:
+    """Run in a worker process: (duration, None) or (None, error message)."""
+    audio_bytes, dst = job
+    try:
+        return _write_wav(audio_bytes, dst), None
+    except Exception as exc:  # one bad clip shouldn't stop a 4 GB run
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def load(out_dir: str | Path, config: str = CONFIG, max_per_split: int | None = None,
+         workers: int = 4) -> pd.DataFrame:
     """Download the labelled splits and write each clip as 16 kHz mono WAV.
 
     Keeps WAXAL's own split in an `official_split` column; scripts/make_splits.py
     re-splits by speaker.
     """
+    from concurrent.futures import ProcessPoolExecutor
+
     lang = config.split("_")[0]
     out_dir = Path(out_dir)
     rows, failed = [], 0
-    for split in LABELLED_SPLITS:
-        split_dir = out_dir / split
-        split_dir.mkdir(parents=True, exist_ok=True)
-        n_split = 0
-        for ex in _rows(lang, split, max_per_split):
-            text = (ex.get("transcription") or "").strip()
-            audio = ex.get("audio") or {}
-            if not text or not audio.get("bytes"):
-                continue
-            wav = split_dir / f"{ex['id']}.wav"
-            try:
-                duration = _write_wav(audio["bytes"], wav)
-            except Exception as exc:  # one bad clip shouldn't stop a 4 GB run
-                log.warning("waxal/%s: could not decode %s: %s", split, ex["id"], exc)
-                failed += 1
-                continue
-            rows.append({
-                "utt_id": f"waxal:{ex['id']}",
-                "audio_path": str(wav),
-                "text": text,
-                "speaker_id": f"waxal:{ex['speaker_id']}",
-                "dataset": "waxal",
-                "dialect": "akan",
-                "gender": normalize_gender(ex.get("gender")),
-                "duration_s": duration,
-                "official_split": split,
-            })
-            n_split += 1
-            if n_split % 2000 == 0:
-                log.info("waxal/%s: %d clips written", split, n_split)
-        log.info("waxal/%s: %d utterances", split, n_split)
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for split in LABELLED_SPLITS:
+            split_dir = out_dir / split
+            split_dir.mkdir(parents=True, exist_ok=True)
+            n_split = 0
+            for group in _row_groups(lang, split, max_per_split):
+                group = [ex for ex in group
+                         if (ex.get("transcription") or "").strip()
+                         and (ex.get("audio") or {}).get("bytes")]
+                jobs = [(ex["audio"]["bytes"], split_dir / f"{ex['id']}.wav") for ex in group]
+                for ex, (duration, err) in zip(group, pool.map(_decode_job, jobs)):
+                    if err:
+                        log.warning("waxal/%s: could not decode %s: %s", split, ex["id"], err)
+                        failed += 1
+                        continue
+                    rows.append({
+                        "utt_id": f"waxal:{ex['id']}",
+                        "audio_path": str(split_dir / f"{ex['id']}.wav"),
+                        "text": ex["transcription"].strip(),
+                        "speaker_id": f"waxal:{ex['speaker_id']}",
+                        "dataset": "waxal",
+                        "dialect": "akan",
+                        "gender": normalize_gender(ex.get("gender")),
+                        "duration_s": duration,
+                        "official_split": split,
+                    })
+                    n_split += 1
+                if n_split and n_split % 2000 < len(group):
+                    log.info("waxal/%s: %d clips written", split, n_split)
+            log.info("waxal/%s: %d utterances", split, n_split)
     if failed:
         log.warning("waxal: %d clips failed to decode and were skipped", failed)
     df = make_manifest(rows)

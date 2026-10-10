@@ -40,3 +40,7 @@ def test_empty_and_none():
 
 def test_charset():
     assert akan_charset(["Ɛte sɛn", "ɔbaa"]) == set("ɛtesnɔba")
+
+
+def test_euler_sign_lookalike_maps_to_open_e():
+    assert normalize("Mepℇ sℇ") == "mepɛ sɛ"

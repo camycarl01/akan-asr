@@ -61,7 +61,8 @@ def main() -> None:
     elif args.dataset == "waxal":
         from akan_asr.datasets import waxal
         name = "waxal"
-        df = waxal.load(args.out / "audio" / name, max_per_split=args.limit)
+        df = waxal.load(args.out / "audio" / name, max_per_split=args.limit,
+                        workers=args.workers)
     else:
         need = [args.root, args.transcripts, args.transcript_audio_col, args.transcript_text_col]
         if not all(need):

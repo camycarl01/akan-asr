@@ -15,6 +15,8 @@ Decisions that matter for the write-up:
 - Clips over 30 s are dropped (Whisper's window), same as in evaluation.
 - The checkpoint kept as "best" has the lowest *mean* validation WER across
   datasets, so a large dataset cannot hide a drop on a small one.
+- With balance=True, batches draw from each training dataset equally often
+  (sampling with replacement), instead of in proportion to dataset size.
 """
 
 from __future__ import annotations
@@ -65,6 +67,7 @@ class TrainConfig:
     val_utts: int = 400  # per evaluation, split evenly across val datasets
     seed: int = 13
     limit: int | None = None  # training utterances, for smoke tests
+    balance: bool = False  # sample each training dataset equally often
     num_workers: int = 2
 
 
@@ -144,7 +147,7 @@ def train(cfg: TrainConfig) -> Path:
     """Train a LoRA adapter; returns the folder of the best checkpoint."""
     import torch
     from peft import LoraConfig, get_peft_model
-    from torch.utils.data import DataLoader
+    from torch.utils.data import DataLoader, WeightedRandomSampler
     from transformers import (WhisperForConditionalGeneration, WhisperProcessor,
                               get_linear_schedule_with_warmup)
 
@@ -183,9 +186,17 @@ def train(cfg: TrainConfig) -> Path:
     log.info("validation subset: %s", val_df["dataset"].value_counts().to_dict())
 
     collate = WhisperCollator(processor)
+    generator = torch.Generator().manual_seed(cfg.seed)
+    sampler = None
+    if cfg.balance and train_df["dataset"].nunique() > 1:
+        sizes = train_df["dataset"].map(train_df["dataset"].value_counts())
+        sampler = WeightedRandomSampler(torch.tensor((1.0 / sizes).to_numpy()),
+                                        num_samples=len(train_df), replacement=True,
+                                        generator=generator)
+        log.info("balanced sampling: each dataset drawn equally often")
     train_dl = DataLoader(AudioTextDataset(train_df), batch_size=cfg.batch_size,
-                          shuffle=True, collate_fn=collate, num_workers=cfg.num_workers,
-                          generator=torch.Generator().manual_seed(cfg.seed),
+                          shuffle=sampler is None, sampler=sampler, collate_fn=collate,
+                          num_workers=cfg.num_workers, generator=generator,
                           pin_memory=use_amp)
     val_dl = DataLoader(AudioTextDataset(val_df), batch_size=cfg.batch_size,
                         collate_fn=collate, num_workers=cfg.num_workers)

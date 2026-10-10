@@ -56,6 +56,8 @@ def main() -> None:
     ap.add_argument("--val-utts", type=int, default=d.val_utts)
     ap.add_argument("--seed", type=int, default=d.seed)
     ap.add_argument("--limit", type=int, help="random N training clips (smoke test)")
+    ap.add_argument("--balance", action="store_true",
+                    help="draw each training dataset equally often, not by size")
     ap.add_argument("--num-workers", type=int, default=d.num_workers)
     ap.add_argument("--run-name")
     ap.add_argument("--adapters", type=Path, default=Path("adapters"))
@@ -71,7 +73,7 @@ def main() -> None:
         epochs=args.epochs, max_steps=args.max_steps, batch_size=args.batch_size,
         grad_accum=args.grad_accum, warmup_steps=args.warmup_steps,
         eval_every=args.eval_every, val_utts=args.val_utts, seed=args.seed,
-        limit=args.limit, num_workers=args.num_workers,
+        limit=args.limit, num_workers=args.num_workers, balance=args.balance,
     )
     train(cfg)
 

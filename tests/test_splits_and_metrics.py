@@ -3,7 +3,7 @@ import pytest
 
 from akan_asr.datasets.fin_incl import parse_filename
 from akan_asr.manifest import make_manifest
-from akan_asr.metrics import score
+from akan_asr.metrics import paired_difference, score
 from akan_asr.splits import (assert_speaker_disjoint, cross_dataset_overlap,
                              speaker_split, text_leakage)
 
@@ -114,3 +114,18 @@ def test_corpus_wer_weights_by_length():
 def test_fin_incl_filename_parsing(name, speaker, gender, age):
     info = parse_filename(name)
     assert (info["speaker"], info["gender"], info["age"]) == (speaker, gender, age)
+
+
+def test_paired_difference_detects_consistent_gain():
+    refs = ["me pɛ sika no"] * 50 + ["ɛte sɛn"] * 50
+    better = list(refs)
+    worse = ["me pɛ nsuo no"] * 50 + ["ɛte sɛn"] * 50  # one extra error on half the clips
+    res = paired_difference(refs, better, worse, n_bootstrap=2000)
+    assert res.diff == pytest.approx(-50 / 300)
+    assert res.ci_high < 0 and res.p_value < 0.01
+
+
+def test_paired_difference_identical_systems():
+    refs = ["a b c", "d e"]
+    res = paired_difference(refs, ["a x c", "d e"], ["a x c", "d e"], n_bootstrap=500)
+    assert res.diff == 0 and res.p_value == 1.0
